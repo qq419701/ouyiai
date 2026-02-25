@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  apiKeyEncrypted String
+  apiSecretEncrypted String
+  passphraseEncrypted String
+  isActive      Boolean  @default(true)
+  permissions   AccountPermission[]
+  orders        Order[]
+  auditLogs     AuditLog[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("accounts")
+}
+
+model AccountPermission {
+  id        String   @id @default(uuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id])
+  coin      String   // BTC, ETH, SOL
+  mode      String   // observe, notify_only, auto_buy, auto_sell, auto_both
+  dailyLimit Float   @default(0)
+  singleOrderMax Float @default(0)
+  dailyTradeCount Int @default(0)
+  currentDailyTrades Int @default(0)
+  currentDailyVolume Float @default(0)
+  lastResetAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([accountId, coin])
+  @@map("account_permissions")
+}
+
+model Order {
+  id            String   @id @default(uuid())
+  accountId     String
+  account       Account  @relation(fields: [accountId], references: [id])
+  clOrdId       String   @unique
+  coin          String
+  side          String   // buy, sell
+  size          Float
+  price         Float?
+  avgFillPrice  Float?
+  status        String   // pending, submitted, accepted, partial_fill, filled, cancelled, failed
+  riskLevel     String   // P0, P1, P2
+  analysisId    String?
+  slippageActual Float?
+  batchIndex    Int      @default(0)
+  totalBatches  Int      @default(1)
+  retryCount    Int      @default(0)
+  errorMessage  String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("orders")
+}
+
+model KlineData {
+  id        String   @id @default(uuid())
+  coin      String
+  interval  String   // 1m, 5m, 15m, 1h, 1d
+  openTime  DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float
+  createdAt DateTime @default(now())
+
+  @@unique([coin, interval, openTime])
+  @@index([coin, interval, openTime])
+  @@map("kline_data")
+}
+
+model TechnicalIndicator {
+  id          String   @id @default(uuid())
+  coin        String
+  interval    String
+  calculatedAt DateTime
+  sma20       Float?
+  sma60       Float?
+  sma200      Float?
+  ema8        Float?
+  ema21       Float?
+  ema55       Float?
+  ema144      Float?
+  ema200      Float?
+  emaSlope    Float?
+  maAlignmentScore Float?
+  macdLine    Float?
+  macdSignal  Float?
+  macdHistogram Float?
+  rsi14       Float?
+  adxValue    Float?
+  bbWidth     Float?
+  atr5m       Float?
+  atr15m      Float?
+  atr1h       Float?
+  rangePercent1h Float?
+  volumeRatio5m Float?
+  volumeRatio15m Float?
+  volumeAcceleration Float?
+  poc         Float?
+  valueAreaHigh Float?
+  valueAreaLow Float?
+  createdAt   DateTime @default(now())
+
+  @@unique([coin, interval, calculatedAt])
+  @@map("technical_indicators")
+}
+
+model WhaleSnapshot {
+  id              String   @id @default(uuid())
+  coin            String
+  provider        String
+  dataQuality     String   // fresh, stale, degraded
+  exchangeNetflow1h Float?
+  exchangeNetflow24h Float?
+  largeTransfersCount1h Int?
+  largeTransfersVolume1h Float?
+  top100HolderChange24h Float?
+  dexBigSwaps1h   Int?
+  dexBigSwapsVolume1h Float?
+  liquidityPullDetected Boolean @default(false)
+  whaleScore      Float
+  whaleBias       String   // bullish, bearish, neutral
+  scoreBreakdown  Json?
+  snapshotAt      DateTime
+  createdAt       DateTime @default(now())
+
+  @@index([coin, snapshotAt])
+  @@map("whale_snapshots")
+}
+
+model AnalysisResult {
+  id              String   @id @default(uuid())
+  coin            String
+  ai1Output       Json?
+  ai2Output       Json?
+  ai3Output       Json?
+  arbitrationResult Json?
+  finalAction     String   // buy, sell, hold
+  finalConfidence Float
+  riskLevel       String   // P0, P1, P2
+  whaleScore      Float?
+  modelTier       String   // cheap, premium
+  totalTokens     Int?
+  estimatedCost   Float?
+  analysedAt      DateTime @default(now())
+
+  @@index([coin, analysedAt])
+  @@map("analysis_results")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  accountId     String?
+  account       Account? @relation(fields: [accountId], references: [id])
+  eventType     String
+  coin          String?
+  orderId       String?
+  analysisId    String?
+  data          Json
+  previousHash  String?
+  hash          String   @unique
+  sequenceNum   Int
+  createdAt     DateTime @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([coin, createdAt])
+  @@index([eventType, createdAt])
+  @@map("audit_logs")
+}
+
+model SystemHealth {
+  id                    String   @id @default(uuid())
+  wsLatency             Float
+  restApiLatency        Float
+  errorRate             Float
+  aiLatency             Float
+  whaleDataFreshness    Float
+  orderSuccessRate      Float
+  overallScore          Float
+  systemMode            String   // active, degraded, paused, emergency
+  recordedAt            DateTime @default(now())
+
+  @@map("system_health")
+}

@@ -1,0 +1,68 @@
+{
+  "P0": {
+    "triggers": {
+      "priceChange5min": 3.0,
+      "orderbookDepthDrop": 50.0,
+      "whaleScoreThreshold": 85,
+      "flashMoveFlag": true
+    },
+    "actions": {
+      "maxPositionPct": 3,
+      "batchCount": 3,
+      "batchIntervalSec": 10,
+      "cooldownSec": 300,
+      "maxSlippagePct": 0.5,
+      "notifyAllChannels": true,
+      "canOverrideCooldown": true
+    }
+  },
+  "P1": {
+    "triggers": {
+      "structureBreakout": true,
+      "atrMultiplier": 1.5,
+      "whaleScoreMin": 60,
+      "whaleScoreMax": 85,
+      "regimeShiftFlag": true
+    },
+    "actions": {
+      "maxPositionPct": 5,
+      "batchCount": 2,
+      "batchIntervalSec": 0,
+      "cooldownSec": 120,
+      "maxSlippagePct": 0.3,
+      "notifyAllChannels": false,
+      "canOverrideCooldown": false
+    }
+  },
+  "P2": {
+    "triggers": {
+      "trendSignal": true,
+      "whaleScoreMax": 60
+    },
+    "actions": {
+      "maxPositionPct": 8,
+      "batchCount": 1,
+      "batchIntervalSec": 0,
+      "cooldownSec": 60,
+      "maxSlippagePct": 0.2,
+      "notifyAllChannels": false,
+      "canOverrideCooldown": false
+    }
+  },
+  "healthThresholds": {
+    "ws_latency": { "healthy": 100, "degraded": 500 },
+    "rest_api_latency": { "healthy": 200, "degraded": 800 },
+    "error_rate": { "healthy": 0.5, "degraded": 2.0 },
+    "ai_latency": { "healthy": 3000, "degraded": 10000 },
+    "whale_data_freshness_min": { "healthy": 5, "degraded": 30 },
+    "order_success_rate": { "healthy": 99, "degraded": 95 }
+  },
+  "healthWeights": {
+    "ws_latency": 0.2,
+    "rest_api_latency": 0.2,
+    "error_rate": 0.25,
+    "ai_latency": 0.15,
+    "whale_data_freshness": 0.1,
+    "order_success_rate": 0.1
+  }
+}
