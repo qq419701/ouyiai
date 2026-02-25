@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交易记录 - OKX AI 分析系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>🤖 OKX AI<br>分析系统 V2.0</h1>
+    <p>现货智能分析平台</p>
+  </div>
+  <div class="nav-menu">
+    <a class="nav-item" href="/"><span class="icon">📊</span><span>仪表盘</span></a>
+    <a class="nav-item" href="/accounts.html"><span class="icon">👤</span><span>账户管理</span></a>
+    <a class="nav-item" href="/analysis.html"><span class="icon">🧠</span><span>AI分析</span></a>
+    <a class="nav-item" href="/orders.html"><span class="icon">📋</span><span>交易记录</span></a>
+    <a class="nav-item" href="/audit.html"><span class="icon">🔍</span><span>审计日志</span></a>
+    <a class="nav-item" href="/monitor.html"><span class="icon">🖥️</span><span>系统监控</span></a>
+    <a class="nav-item" href="/settings.html"><span class="icon">⚙️</span><span>系统配置</span></a>
+  </div>
+  <div class="sidebar-footer">
+    <button class="btn btn-sm btn-secondary" onclick="logout()">退出登录</button>
+  </div>
+</nav>
+
+<main class="main-content">
+  <div class="page-header">
+    <div>
+      <div class="page-title">交易记录</div>
+      <div class="page-subtitle">AI 自动下单历史</div>
+    </div>
+    <button class="btn btn-secondary" onclick="loadOrders()">🔄 刷新</button>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div class="grid grid-4" id="stats-row" style="margin-bottom:16px;">
+    <div class="stat-card"><div class="stat-label">总订单数</div><div class="stat-value" id="s-total">--</div></div>
+    <div class="stat-card"><div class="stat-label">已成交</div><div class="stat-value" style="color:var(--accent-green)" id="s-filled">--</div></div>
+    <div class="stat-card"><div class="stat-label">失败订单</div><div class="stat-value" style="color:var(--accent-red)" id="s-failed">--</div></div>
+    <div class="stat-card"><div class="stat-label">成功率</div><div class="stat-value" id="s-rate">--</div></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+      <select class="form-control" id="filter-status" style="width:140px;" onchange="loadOrders()">
+        <option value="">全部状态</option>
+        <option value="pending">待执行</option>
+        <option value="filled">已成交</option>
+        <option value="cancelled">已取消</option>
+        <option value="failed">失败</option>
+      </select>
+      <select class="form-control" id="filter-coin" style="width:140px;" onchange="loadOrders()">
+        <option value="">全部币种</option>
+        <option value="BTC-USDT">BTC-USDT</option>
+        <option value="ETH-USDT">ETH-USDT</option>
+        <option value="SOL-USDT">SOL-USDT</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>币种</th>
+            <th>方向</th>
+            <th>数量</th>
+            <th>价格</th>
+            <th>滑点</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="orders-tbody">
+          <tr><td colspan="8" class="loading">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
+      <button class="btn btn-sm btn-secondary" id="prev-btn" onclick="changePage(-1)">上一页</button>
+      <span id="page-info" style="line-height:28px;font-size:13px;"></span>
+      <button class="btn btn-sm btn-secondary" id="next-btn" onclick="changePage(1)">下一页</button>
+    </div>
+  </div>
+</main>
+
+<!-- 订单详情弹窗 -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">订单详情</div>
+      <button class="modal-close" onclick="document.getElementById('detail-modal').classList.remove('show')">✕</button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+let page = 1;
+const pageSize = 20;
+let totalPages = 1;
+
+async function loadStats() {
+  try {
+    const data = await apiFetch('/api/orders/stats');
+    if (!data) return;
+    document.getElementById('s-total').textContent = fmt.number(data.total || 0);
+    document.getElementById('s-filled').textContent = fmt.number(data.filled || 0);
+    document.getElementById('s-failed').textContent = fmt.number(data.failed || 0);
+    const rate = data.total ? ((data.filled || 0) / data.total) : 0;
+    document.getElementById('s-rate').textContent = fmt.pct(rate);
+  } catch {}
+}
+
+async function loadOrders() {
+  const status = document.getElementById('filter-status').value;
+  const coin = document.getElementById('filter-coin').value;
+  try {
+    const params = new URLSearchParams({ page, pageSize });
+    if (status) params.append('status', status);
+    if (coin) params.append('coin', coin);
+    const data = await apiFetch('/api/orders?' + params);
+    if (!data) return;
+    const items = data.items || data || [];
+    totalPages = data.totalPages || Math.ceil((data.total || items.length) / pageSize) || 1;
+    document.getElementById('page-info').textContent = `第 ${page}/${totalPages} 页`;
+    document.getElementById('prev-btn').disabled = page <= 1;
+    document.getElementById('next-btn').disabled = page >= totalPages;
+    if (!items.length) {
+      document.getElementById('orders-tbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:24px;">暂无交易记录</td></tr>';
+      return;
+    }
+    document.getElementById('orders-tbody').innerHTML = items.map(o => `<tr>
+      <td>${fmt.time(o.created_at || o.createdAt)}</td>
+      <td>${o.coin || o.symbol}</td>
+      <td>${statusBadge(o.side || o.direction)}</td>
+      <td>${o.size || o.quantity || '--'}</td>
+      <td>${fmt.price(o.price)}</td>
+      <td>${o.slippage_bps != null ? o.slippage_bps + ' bps' : '--'}</td>
+      <td>${statusBadge(o.status)}</td>
+      <td><button class="btn btn-sm btn-secondary" onclick="showDetail(${JSON.stringify(o).replace(/"/g,'&quot;')})">详情</button></td>
+    </tr>`).join('');
+  } catch(e) {
+    document.getElementById('orders-tbody').innerHTML = `<tr><td colspan="8" style="color:var(--accent-red);">加载失败: ${e.message}</td></tr>`;
+  }
+}
+
+function showDetail(o) {
+  document.getElementById('detail-content').innerHTML = `
+    <div style="display:grid;gap:8px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+        <span style="color:var(--text-secondary);">订单ID</span><span>${o.id}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+        <span style="color:var(--text-secondary);">币种</span><span>${o.coin || o.symbol}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+        <span style="color:var(--text-secondary);">方向</span><span>${statusBadge(o.side || o.direction)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+        <span style="color:var(--text-secondary);">价格</span><span>${fmt.price(o.price)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+        <span style="color:var(--text-secondary);">数量</span><span>${o.size || o.quantity}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+        <span style="color:var(--text-secondary);">状态</span><span>${statusBadge(o.status)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+        <span style="color:var(--text-secondary);">滑点</span><span>${o.slippage_bps != null ? o.slippage_bps + ' bps' : '--'}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;">
+        <span style="color:var(--text-secondary);">时间</span><span>${fmt.time(o.created_at || o.createdAt)}</span>
+      </div>
+    </div>`;
+  document.getElementById('detail-modal').classList.add('show');
+}
+
+function changePage(delta) {
+  page = Math.max(1, Math.min(totalPages, page + delta));
+  loadOrders();
+}
+
+loadStats();
+loadOrders();
+</script>
+</body>
+</html>

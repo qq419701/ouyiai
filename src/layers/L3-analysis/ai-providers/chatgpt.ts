@@ -1,10 +1,17 @@
+// ChatGPT（OpenAI）AI 提供者
+// 功能：调用 OpenAI GPT 模型进行现货交易分析
+// API文档：https://api.openai.com/v1/chat/completions
 import OpenAI from 'openai';
 import { env } from '../../../config/env';
 import { AIOutput } from '../types';
 import { CoinSymbol, TradeAction, RiskLevel } from '../../../utils/types';
 
+// OpenAI 客户端单例
 let client: OpenAI | null = null;
 
+/**
+ * 获取 OpenAI 客户端（懒加载）
+ */
 function getClient(): OpenAI {
   if (!client) {
     client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
@@ -12,7 +19,13 @@ function getClient(): OpenAI {
   return client;
 }
 
-export async function callOpenAI(
+/**
+ * 调用 ChatGPT（OpenAI）进行市场分析
+ * @param prompt 分析提示词
+ * @param model 模型名称（如 gpt-4o-mini）
+ * @param coin 交易币种
+ */
+export async function callChatGPT(
   prompt: string,
   model: string,
   coin: CoinSymbol,
@@ -31,6 +44,7 @@ export async function callOpenAI(
   const latency = Date.now() - start;
   const content = response.choices[0]?.message?.content || '{}';
   const tokens = response.usage?.total_tokens || 0;
+  // gpt-4o-mini: $0.00015/千tokens，gpt-4o: $0.005/千tokens
   const costPer1k = model.includes('gpt-4o-mini') ? 0.00015 : 0.005;
 
   let analysis;
@@ -41,7 +55,7 @@ export async function callOpenAI(
   }
 
   return {
-    ai_id: 'AI-2',
+    ai_id: 'AI-3',
     model,
     coin,
     latency_ms: latency,

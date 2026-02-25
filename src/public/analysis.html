@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI分析 - OKX AI 分析系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>🤖 OKX AI<br>分析系统 V2.0</h1>
+    <p>现货智能分析平台</p>
+  </div>
+  <div class="nav-menu">
+    <a class="nav-item" href="/"><span class="icon">📊</span><span>仪表盘</span></a>
+    <a class="nav-item" href="/accounts.html"><span class="icon">👤</span><span>账户管理</span></a>
+    <a class="nav-item" href="/analysis.html"><span class="icon">🧠</span><span>AI分析</span></a>
+    <a class="nav-item" href="/orders.html"><span class="icon">📋</span><span>交易记录</span></a>
+    <a class="nav-item" href="/audit.html"><span class="icon">🔍</span><span>审计日志</span></a>
+    <a class="nav-item" href="/monitor.html"><span class="icon">🖥️</span><span>系统监控</span></a>
+    <a class="nav-item" href="/settings.html"><span class="icon">⚙️</span><span>系统配置</span></a>
+  </div>
+  <div class="sidebar-footer">
+    <button class="btn btn-sm btn-secondary" onclick="logout()">退出登录</button>
+  </div>
+</nav>
+
+<main class="main-content">
+  <div class="page-header">
+    <div>
+      <div class="page-title">AI 分析面板</div>
+      <div class="page-subtitle">豆包 · Gemini · ChatGPT 三AI协同分析</div>
+    </div>
+    <button class="btn btn-secondary" onclick="loadLatest()">🔄 刷新</button>
+  </div>
+
+  <!-- 最新分析结果 -->
+  <div id="latest-section">
+    <div class="card"><div class="loading">加载中...</div></div>
+  </div>
+
+  <!-- 历史记录 -->
+  <div class="card" style="margin-top:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="card-title" style="margin:0;">历史分析记录</div>
+      <div style="display:flex;gap:8px;">
+        <select class="form-control" id="hist-coin" style="width:140px;" onchange="loadHistory()">
+          <option value="">全部币种</option>
+          <option value="BTC-USDT">BTC-USDT</option>
+          <option value="ETH-USDT">ETH-USDT</option>
+          <option value="SOL-USDT">SOL-USDT</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>币种</th>
+            <th>豆包</th>
+            <th>Gemini</th>
+            <th>ChatGPT</th>
+            <th>仲裁结果</th>
+            <th>置信度</th>
+            <th>共识类型</th>
+            <th>Token消耗</th>
+            <th>成本($)</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody">
+          <tr><td colspan="10" class="loading">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
+      <button class="btn btn-sm btn-secondary" id="prev-btn" onclick="changePage(-1)">上一页</button>
+      <span id="page-info" style="line-height:28px;font-size:13px;"></span>
+      <button class="btn btn-sm btn-secondary" id="next-btn" onclick="changePage(1)">下一页</button>
+    </div>
+  </div>
+</main>
+
+<script src="/js/app.js"></script>
+<script>
+let page = 1;
+const pageSize = 20;
+let totalPages = 1;
+
+const aiNames = { 'AI-1': '豆包', 'AI-2': 'Gemini', 'AI-3': 'ChatGPT' };
+const consensusLabels = { '3_unanimous': '3票一致', '2_majority': '2票多数', 'diverged': '意见分歧' };
+
+async function loadLatest() {
+  try {
+    const data = await apiFetch('/api/analysis/latest');
+    if (!data) return;
+    const coins = Array.isArray(data) ? data : Object.values(data);
+    document.getElementById('latest-section').innerHTML = coins.map(r => `
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div>
+            <span style="font-size:16px;font-weight:700;">${r.coin}</span>
+            <span class="badge ${actionBadge[r.final_action] || 'badge-gray'}" style="margin-left:10px;font-size:13px;">
+              ${actionLabel[r.final_action] || r.final_action}
+            </span>
+            <span class="badge badge-blue" style="margin-left:6px;">${consensusLabels[r.consensus_type] || r.consensus_type}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-secondary);">${fmt.time(r.analysed_at)}</div>
+        </div>
+        <div class="grid grid-3">
+          ${(r.ai_outputs || []).map(ai => `
+            <div class="stat-card">
+              <div class="stat-label">🤖 ${aiNames[ai.ai_id] || ai.ai_id}</div>
+              <div style="margin:8px 0;">
+                <span class="badge ${actionBadge[ai.analysis?.action] || 'badge-gray'}">${actionLabel[ai.analysis?.action] || ai.analysis?.action}</span>
+                <span style="margin-left:8px;font-size:13px;color:var(--text-secondary);">
+                  置信度 ${fmt.pct(ai.analysis?.confidence)}
+                </span>
+              </div>
+              <div style="font-size:12px;color:var(--text-secondary);">
+                延迟: ${ai.latency_ms}ms | Token: ${fmt.number(ai.tokens_used)}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="margin-top:12px;display:flex;gap:16px;font-size:13px;color:var(--text-secondary);">
+          <span>总置信度: <strong style="color:var(--text-primary);">${fmt.pct(r.final_confidence)}</strong></span>
+          <span>风险等级: <strong>${r.risk_level}</strong></span>
+          <span>模型档位: <strong>${r.model_tier === 'premium' ? '高级' : '普通'}</strong></span>
+        </div>
+      </div>
+    `).join('') || '<div class="card"><div style="color:var(--text-secondary);text-align:center;padding:24px;">暂无分析数据</div></div>';
+  } catch(e) {
+    document.getElementById('latest-section').innerHTML = `<div class="card"><div style="color:var(--accent-red);">加载失败: ${e.message}</div></div>`;
+  }
+}
+
+async function loadHistory() {
+  const coin = document.getElementById('hist-coin').value;
+  try {
+    const params = new URLSearchParams({ page, pageSize });
+    if (coin) params.append('coin', coin);
+    const data = await apiFetch('/api/analysis/history?' + params);
+    if (!data) return;
+    const items = data.items || data || [];
+    totalPages = data.totalPages || Math.ceil((data.total || items.length) / pageSize) || 1;
+    document.getElementById('page-info').textContent = `第 ${page}/${totalPages} 页`;
+    document.getElementById('prev-btn').disabled = page <= 1;
+    document.getElementById('next-btn').disabled = page >= totalPages;
+    if (!items.length) {
+      document.getElementById('history-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-secondary);padding:24px;">暂无历史记录</td></tr>';
+      return;
+    }
+    document.getElementById('history-tbody').innerHTML = items.map(r => {
+      const ai1 = (r.ai_outputs || []).find(a => a.ai_id === 'AI-1');
+      const ai2 = (r.ai_outputs || []).find(a => a.ai_id === 'AI-2');
+      const ai3 = (r.ai_outputs || []).find(a => a.ai_id === 'AI-3');
+      const totalTokens = (r.ai_outputs || []).reduce((s, a) => s + (a.tokens_used || 0), 0);
+      const totalCost = (r.ai_outputs || []).reduce((s, a) => s + (a.estimated_cost || 0), 0);
+      return `<tr>
+        <td>${fmt.time(r.analysed_at)}</td>
+        <td>${r.coin}</td>
+        <td><span class="badge ${actionBadge[ai1?.analysis?.action] || 'badge-gray'}">${actionLabel[ai1?.analysis?.action] || '--'}</span></td>
+        <td><span class="badge ${actionBadge[ai2?.analysis?.action] || 'badge-gray'}">${actionLabel[ai2?.analysis?.action] || '--'}</span></td>
+        <td><span class="badge ${actionBadge[ai3?.analysis?.action] || 'badge-gray'}">${actionLabel[ai3?.analysis?.action] || '--'}</span></td>
+        <td><span class="badge ${actionBadge[r.final_action] || 'badge-gray'}">${actionLabel[r.final_action] || r.final_action}</span></td>
+        <td>${fmt.pct(r.final_confidence)}</td>
+        <td>${consensusLabels[r.consensus_type] || r.consensus_type || '--'}</td>
+        <td>${fmt.number(totalTokens)}</td>
+        <td>$${totalCost.toFixed(5)}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('history-tbody').innerHTML = `<tr><td colspan="10" style="color:var(--accent-red);">加载失败: ${e.message}</td></tr>`;
+  }
+}
+
+function changePage(delta) {
+  page = Math.max(1, Math.min(totalPages, page + delta));
+  loadHistory();
+}
+
+loadLatest();
+loadHistory();
+setInterval(loadLatest, 60000);
+</script>
+</body>
+</html>

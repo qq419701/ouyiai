@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>系统监控 - OKX AI 分析系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>🤖 OKX AI<br>分析系统 V2.0</h1>
+    <p>现货智能分析平台</p>
+  </div>
+  <div class="nav-menu">
+    <a class="nav-item" href="/"><span class="icon">📊</span><span>仪表盘</span></a>
+    <a class="nav-item" href="/accounts.html"><span class="icon">👤</span><span>账户管理</span></a>
+    <a class="nav-item" href="/analysis.html"><span class="icon">🧠</span><span>AI分析</span></a>
+    <a class="nav-item" href="/orders.html"><span class="icon">📋</span><span>交易记录</span></a>
+    <a class="nav-item" href="/audit.html"><span class="icon">🔍</span><span>审计日志</span></a>
+    <a class="nav-item" href="/monitor.html"><span class="icon">🖥️</span><span>系统监控</span></a>
+    <a class="nav-item" href="/settings.html"><span class="icon">⚙️</span><span>系统配置</span></a>
+  </div>
+  <div class="sidebar-footer">
+    <button class="btn btn-sm btn-secondary" onclick="logout()">退出登录</button>
+  </div>
+</nav>
+
+<main class="main-content">
+  <div class="page-header">
+    <div>
+      <div class="page-title">系统监控</div>
+      <div class="page-subtitle">API健康状态 · AI服务 · 数据源</div>
+    </div>
+    <button class="btn btn-secondary" onclick="loadMonitor()">🔄 刷新</button>
+  </div>
+
+  <div class="grid grid-2">
+    <!-- OKX API 状态 -->
+    <div class="card">
+      <div class="card-title">OKX API 状态</div>
+      <div id="okx-status"><div class="loading">加载中...</div></div>
+    </div>
+
+    <!-- AI 服务状态 -->
+    <div class="card">
+      <div class="card-title">AI 服务状态</div>
+      <div id="ai-status"><div class="loading">加载中...</div></div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <!-- 巨鲸数据源 -->
+    <div class="card">
+      <div class="card-title">🐋 巨鲸数据源</div>
+      <div id="whale-status"><div class="loading">加载中...</div></div>
+    </div>
+
+    <!-- 数据库/缓存 -->
+    <div class="card">
+      <div class="card-title">数据库 / 缓存</div>
+      <div id="db-status"><div class="loading">加载中...</div></div>
+    </div>
+  </div>
+
+  <!-- 系统降级状态 -->
+  <div class="card">
+    <div class="card-title">系统降级状态</div>
+    <div id="degradation-status"><div class="loading">加载中...</div></div>
+  </div>
+</main>
+
+<script src="/js/app.js"></script>
+<script>
+function latencyBadge(ms) {
+  if (ms == null) return '<span class="badge badge-gray">--</span>';
+  if (ms < 100) return `<span class="badge badge-green">${ms}ms</span>`;
+  if (ms < 500) return `<span class="badge badge-yellow">${ms}ms</span>`;
+  return `<span class="badge badge-red">${ms}ms</span>`;
+}
+
+function boolBadge(v, trueLabel = '正常', falseLabel = '异常') {
+  return v
+    ? `<span class="badge badge-green"><span class="status-dot online"></span>${trueLabel}</span>`
+    : `<span class="badge badge-red"><span class="status-dot offline"></span>${falseLabel}</span>`;
+}
+
+async function loadMonitor() {
+  try {
+    const data = await apiFetch('/api/monitor/status');
+    if (!data) return;
+
+    // OKX API
+    const okx = data.okx || {};
+    document.getElementById('okx-status').innerHTML = `
+      <div style="display:grid;gap:8px;">
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+          <span>WebSocket 连接</span>${boolBadge(okx.ws_connected)}
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+          <span>WS 延迟</span>${latencyBadge(okx.ws_latency_ms)}
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+          <span>REST API 延迟</span>${latencyBadge(okx.rest_latency_ms)}
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;">
+          <span>错误率</span>
+          <span class="${(okx.error_rate || 0) > 5 ? 'badge badge-red' : 'badge badge-green'}">${((okx.error_rate || 0)).toFixed(1)}%</span>
+        </div>
+      </div>`;
+
+    // AI 服务
+    const ai = data.ai || {};
+    const aiMap = [
+      { id: 'AI-1', name: '豆包 (Doubao)', data: ai['AI-1'] || {} },
+      { id: 'AI-2', name: 'Gemini', data: ai['AI-2'] || {} },
+      { id: 'AI-3', name: 'ChatGPT', data: ai['AI-3'] || {} },
+    ];
+    document.getElementById('ai-status').innerHTML = aiMap.map(a => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color);">
+        <span>🤖 ${a.name}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${latencyBadge(a.data.latency_ms)}
+          ${boolBadge(a.data.available !== false)}
+        </div>
+      </div>
+    `).join('');
+
+    // 巨鲸数据源
+    const whale = data.whale || {};
+    document.getElementById('whale-status').innerHTML = `
+      <div style="display:grid;gap:8px;">
+        ${['arkham', 'glassnode', 'whale_alert', 'dune'].map(src => `
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+            <span>${src.replace('_', ' ').toUpperCase()}</span>
+            ${boolBadge(whale[src]?.available, '可用', '不可用/未配置')}
+          </div>
+        `).join('')}
+        <div style="display:flex;justify-content:space-between;padding:8px 0;">
+          <span>数据新鲜度</span>
+          <span>${whale.freshness_seconds != null ? whale.freshness_seconds + '秒前' : '--'}</span>
+        </div>
+      </div>`;
+
+    // 数据库
+    const db = data.database || {};
+    document.getElementById('db-status').innerHTML = `
+      <div style="display:grid;gap:8px;">
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+          <span>PostgreSQL</span>${boolBadge(db.postgres)}
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color);">
+          <span>Redis</span>${boolBadge(db.redis)}
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;">
+          <span>DB 延迟</span>${latencyBadge(db.latency_ms)}
+        </div>
+      </div>`;
+
+    // 降级状态
+    const deg = data.degradation || {};
+    document.getElementById('degradation-status').innerHTML = `
+      <div class="grid grid-4">
+        <div class="stat-card">
+          <div class="stat-label">当前模式</div>
+          <div style="margin-top:8px;">${boolBadge(deg.mode === 'normal', '正常', deg.mode === 'degraded' ? '降级运行' : '紧急停止')}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">暂停交易</div>
+          <div style="margin-top:8px;">${boolBadge(!deg.trading_paused, '运行中', '已暂停')}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">使用缓存AI</div>
+          <div style="margin-top:8px;">${deg.using_cached_ai ? '<span class="badge badge-yellow">是</span>' : '<span class="badge badge-green">否</span>'}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">降级原因</div>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-secondary);">${deg.reason || '--'}</div>
+        </div>
+      </div>`;
+  } catch(e) {
+    console.error('Monitor load error:', e);
+  }
+}
+
+loadMonitor();
+setInterval(loadMonitor, 30000);
+</script>
+</body>
+</html>

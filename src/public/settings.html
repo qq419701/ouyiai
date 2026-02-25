@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>系统配置 - OKX AI 分析系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>🤖 OKX AI<br>分析系统 V2.0</h1>
+    <p>现货智能分析平台</p>
+  </div>
+  <div class="nav-menu">
+    <a class="nav-item" href="/"><span class="icon">📊</span><span>仪表盘</span></a>
+    <a class="nav-item" href="/accounts.html"><span class="icon">👤</span><span>账户管理</span></a>
+    <a class="nav-item" href="/analysis.html"><span class="icon">🧠</span><span>AI分析</span></a>
+    <a class="nav-item" href="/orders.html"><span class="icon">📋</span><span>交易记录</span></a>
+    <a class="nav-item" href="/audit.html"><span class="icon">🔍</span><span>审计日志</span></a>
+    <a class="nav-item" href="/monitor.html"><span class="icon">🖥️</span><span>系统监控</span></a>
+    <a class="nav-item" href="/settings.html"><span class="icon">⚙️</span><span>系统配置</span></a>
+  </div>
+  <div class="sidebar-footer">
+    <button class="btn btn-sm btn-secondary" onclick="logout()">退出登录</button>
+  </div>
+</nav>
+
+<main class="main-content">
+  <div class="page-header">
+    <div>
+      <div class="page-title">系统配置</div>
+      <div class="page-subtitle">环境变量 · 风控规则 · 通知设置</div>
+    </div>
+  </div>
+
+  <!-- 环境变量（只读） -->
+  <div class="card">
+    <div class="card-title">环境变量（密钥已隐藏）</div>
+    <div id="env-config"><div class="loading">加载中...</div></div>
+  </div>
+
+  <!-- 风控规则 -->
+  <div class="card">
+    <div class="card-title">风控规则配置</div>
+    <div id="risk-config"><div class="loading">加载中...</div></div>
+  </div>
+
+  <!-- 通知配置 -->
+  <div class="card">
+    <div class="card-title">通知配置测试</div>
+    <div class="grid grid-2">
+      <div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">测试钉钉机器人是否正常工作</p>
+        <button class="btn btn-secondary" onclick="testNotify('dingtalk')">📲 测试钉钉通知</button>
+      </div>
+      <div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">测试 Telegram 机器人是否正常工作</p>
+        <button class="btn btn-secondary" onclick="testNotify('telegram')">✈️ 测试 Telegram 通知</button>
+      </div>
+    </div>
+    <div id="notify-result" style="margin-top:12px;display:none;"></div>
+  </div>
+</main>
+
+<script src="/js/app.js"></script>
+<script>
+async function loadConfig() {
+  try {
+    const data = await apiFetch('/api/config');
+    if (!data) return;
+
+    // 环境变量（隐藏密钥）
+    const envItems = data.env || {};
+    document.getElementById('env-config').innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+        ${Object.entries(envItems).map(([k, v]) => `
+          <div style="background:var(--bg-primary);border-radius:6px;padding:10px;">
+            <div style="font-size:11px;color:var(--text-secondary);font-family:monospace;">${k}</div>
+            <div style="font-size:13px;margin-top:4px;font-family:monospace;">${v}</div>
+          </div>
+        `).join('')}
+      </div>`;
+
+    // 风控规则
+    const risk = data.risk || {};
+    document.getElementById('risk-config').innerHTML = `
+      <div class="grid grid-3">
+        <div class="stat-card">
+          <div class="stat-label">P0 紧急阈值</div>
+          <div class="stat-value" style="color:var(--accent-red);">${risk.whale_p0 || 85}</div>
+          <div style="font-size:12px;color:var(--text-secondary);">巨鲸评分 ≥ 此值触发</div>
+          <div class="progress" style="margin-top:8px;">
+            <div class="progress-bar red" style="width:${risk.whale_p0 || 85}%"></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">P1 高风险阈值</div>
+          <div class="stat-value" style="color:var(--accent-yellow);">${risk.whale_p1 || 60}</div>
+          <div style="font-size:12px;color:var(--text-secondary);">巨鲸评分 ≥ 此值升级</div>
+          <div class="progress" style="margin-top:8px;">
+            <div class="progress-bar yellow" style="width:${risk.whale_p1 || 60}%"></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">波动率升级倍数</div>
+          <div class="stat-value" style="color:var(--accent-blue);">${risk.volatility_ratio || 1.5}x</div>
+          <div style="font-size:12px;color:var(--text-secondary);">超过此倍数使用高级模型</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">系统暂停阈值</div>
+          <div class="stat-value" style="color:var(--accent-red);">${risk.health_pause || 50}</div>
+          <div style="font-size:12px;color:var(--text-secondary);">健康评分低于此值暂停</div>
+          <div class="progress" style="margin-top:8px;">
+            <div class="progress-bar red" style="width:${risk.health_pause || 50}%"></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">系统警告阈值</div>
+          <div class="stat-value" style="color:var(--accent-yellow);">${risk.health_warn || 80}</div>
+          <div style="font-size:12px;color:var(--text-secondary);">健康评分低于此值告警</div>
+          <div class="progress" style="margin-top:8px;">
+            <div class="progress-bar yellow" style="width:${risk.health_warn || 80}%"></div>
+          </div>
+        </div>
+      </div>`;
+  } catch(e) {
+    console.error('Config load error:', e);
+  }
+}
+
+async function testNotify(channel) {
+  const el = document.getElementById('notify-result');
+  el.style.display = 'block';
+  el.innerHTML = `<div style="color:var(--text-secondary);font-size:13px;">发送中...</div>`;
+  try {
+    const data = await apiFetch('/api/notify/test', {
+      method: 'POST',
+      body: JSON.stringify({ channel }),
+    });
+    el.innerHTML = `<div style="color:var(--accent-green);font-size:13px;">✅ ${channel === 'dingtalk' ? '钉钉' : 'Telegram'} 测试消息发送成功</div>`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--accent-red);font-size:13px;">❌ 发送失败: ${e.message}</div>`;
+  }
+}
+
+loadConfig();
+</script>
+</body>
+</html>
