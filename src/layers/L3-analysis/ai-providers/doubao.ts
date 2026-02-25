@@ -1,47 +1,61 @@
-import Anthropic from '@anthropic-ai/sdk';
+// 豆包 AI 提供者（字节跳动火山引擎）
+// 功能：调用豆包大模型进行现货交易分析
+// API文档：https://ark.cn-beijing.volces.com/api/v3/chat/completions
+import axios from 'axios';
 import { env } from '../../../config/env';
 import { AIOutput } from '../types';
 import { CoinSymbol, TradeAction, RiskLevel } from '../../../utils/types';
 
-let client: Anthropic | null = null;
+// 豆包 API 基础地址（火山引擎）
+const DOUBAO_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
 
-function getClient(): Anthropic {
-  if (!client) {
-    client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-  }
-  return client;
-}
-
-export async function callClaude(
+/**
+ * 调用豆包 AI 进行市场分析
+ * @param prompt 分析提示词
+ * @param model 模型名称（如 doubao-pro-32k）
+ * @param coin 交易币种
+ */
+export async function callDoubao(
   prompt: string,
   model: string,
   coin: CoinSymbol,
 ): Promise<AIOutput> {
   const start = Date.now();
-  const anthropic = getClient();
 
-  const response = await anthropic.messages.create({
-    model,
-    max_tokens: 500,
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.1,
-  });
+  const response = await axios.post(
+    `${DOUBAO_BASE_URL}/chat/completions`,
+    {
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 500,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${env.DOUBAO_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 30000,
+    },
+  );
 
   const latency = Date.now() - start;
-  const content = response.content[0]?.type === 'text' ? response.content[0].text : '{}';
-  const tokens = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
-  const costPer1k = model.includes('haiku') ? 0.0001 : 0.003;
+  const content = response.data.choices[0]?.message?.content || '{}';
+  const tokens = response.data.usage?.total_tokens || 0;
+  // 豆包定价：pro-32k 约 ¥0.0008/千tokens
+  const costPer1k = model.includes('256k') ? 0.0007 : 0.0001;
 
   let analysis;
   try {
+    // 提取 JSON 内容
     const jsonMatch = content.match(/\{[\s\S]*\}/);
-    analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+    analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
   } catch {
     analysis = { action: 'hold', confidence: 0.5, risk_level: 'P2', recommended_size_pct: 0, entry_price_range: [0, 0], stop_loss: 0, take_profit: [], whale_influence: 'unknown', key_factors: ['parse_error'] };
   }
 
   return {
-    ai_id: 'AI-3',
+    ai_id: 'AI-1',
     model,
     coin,
     latency_ms: latency,

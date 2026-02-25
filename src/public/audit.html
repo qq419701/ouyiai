@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>审计日志 - OKX AI 分析系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>🤖 OKX AI<br>分析系统 V2.0</h1>
+    <p>现货智能分析平台</p>
+  </div>
+  <div class="nav-menu">
+    <a class="nav-item" href="/"><span class="icon">📊</span><span>仪表盘</span></a>
+    <a class="nav-item" href="/accounts.html"><span class="icon">👤</span><span>账户管理</span></a>
+    <a class="nav-item" href="/analysis.html"><span class="icon">🧠</span><span>AI分析</span></a>
+    <a class="nav-item" href="/orders.html"><span class="icon">📋</span><span>交易记录</span></a>
+    <a class="nav-item" href="/audit.html"><span class="icon">🔍</span><span>审计日志</span></a>
+    <a class="nav-item" href="/monitor.html"><span class="icon">🖥️</span><span>系统监控</span></a>
+    <a class="nav-item" href="/settings.html"><span class="icon">⚙️</span><span>系统配置</span></a>
+  </div>
+  <div class="sidebar-footer">
+    <button class="btn btn-sm btn-secondary" onclick="logout()">退出登录</button>
+  </div>
+</nav>
+
+<main class="main-content">
+  <div class="page-header">
+    <div>
+      <div class="page-title">审计日志</div>
+      <div class="page-subtitle">全量操作日志，哈希链验证</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary" onclick="verifyChain()">🔐 验证哈希链</button>
+      <button class="btn btn-secondary" onclick="loadAudit()">🔄 刷新</button>
+    </div>
+  </div>
+
+  <div id="chain-status" style="display:none;margin-bottom:16px;"></div>
+
+  <div class="card">
+    <!-- 筛选栏 -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <input type="date" class="form-control" id="filter-from" style="width:150px;" onchange="loadAudit()">
+      <input type="date" class="form-control" id="filter-to" style="width:150px;" onchange="loadAudit()">
+      <select class="form-control" id="filter-coin" style="width:140px;" onchange="loadAudit()">
+        <option value="">全部币种</option>
+        <option value="BTC-USDT">BTC-USDT</option>
+        <option value="ETH-USDT">ETH-USDT</option>
+        <option value="SOL-USDT">SOL-USDT</option>
+      </select>
+      <select class="form-control" id="filter-event" style="width:160px;" onchange="loadAudit()">
+        <option value="">全部事件</option>
+        <option value="ai_analysis">AI分析</option>
+        <option value="order_placed">下单</option>
+        <option value="order_filled">成交</option>
+        <option value="risk_triggered">风控触发</option>
+        <option value="system_mode_change">系统模式变更</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>序号</th>
+            <th>时间</th>
+            <th>事件类型</th>
+            <th>币种</th>
+            <th>摘要</th>
+            <th>哈希</th>
+          </tr>
+        </thead>
+        <tbody id="audit-tbody">
+          <tr><td colspan="6" class="loading">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
+      <button class="btn btn-sm btn-secondary" id="prev-btn" onclick="changePage(-1)">上一页</button>
+      <span id="page-info" style="line-height:28px;font-size:13px;"></span>
+      <button class="btn btn-sm btn-secondary" id="next-btn" onclick="changePage(1)">下一页</button>
+    </div>
+  </div>
+</main>
+
+<script src="/js/app.js"></script>
+<script>
+let page = 1;
+const pageSize = 50;
+let totalPages = 1;
+
+const eventLabels = {
+  ai_analysis: 'AI分析',
+  order_placed: '下单',
+  order_filled: '成交',
+  risk_triggered: '风控触发',
+  system_mode_change: '系统模式变更',
+  account_added: '添加账户',
+  account_deactivated: '停用账户',
+};
+
+async function loadAudit() {
+  const from = document.getElementById('filter-from').value;
+  const to = document.getElementById('filter-to').value;
+  const coin = document.getElementById('filter-coin').value;
+  const event = document.getElementById('filter-event').value;
+  try {
+    const params = new URLSearchParams({ page, pageSize });
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+    if (coin) params.append('coin', coin);
+    if (event) params.append('event', event);
+    const data = await apiFetch('/api/audit?' + params);
+    if (!data) return;
+    const items = data.items || data || [];
+    totalPages = data.totalPages || Math.ceil((data.total || items.length) / pageSize) || 1;
+    document.getElementById('page-info').textContent = `第 ${page}/${totalPages} 页，共 ${data.total || items.length} 条`;
+    document.getElementById('prev-btn').disabled = page <= 1;
+    document.getElementById('next-btn').disabled = page >= totalPages;
+    if (!items.length) {
+      document.getElementById('audit-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:24px;">暂无日志</td></tr>';
+      return;
+    }
+    document.getElementById('audit-tbody').innerHTML = items.map(a => `<tr>
+      <td style="color:var(--text-secondary);">${a.sequence_number || a.id?.slice(0,8)}</td>
+      <td>${fmt.time(a.timestamp)}</td>
+      <td><span class="badge badge-blue">${eventLabels[a.event_type] || a.event_type}</span></td>
+      <td>${a.coin || '--'}</td>
+      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.summary || JSON.stringify(a.payload || {}).slice(0, 60)}</td>
+      <td style="font-family:monospace;font-size:11px;color:var(--text-secondary);">${(a.hash || '').slice(0, 16)}...</td>
+    </tr>`).join('');
+  } catch(e) {
+    document.getElementById('audit-tbody').innerHTML = `<tr><td colspan="6" style="color:var(--accent-red);">加载失败: ${e.message}</td></tr>`;
+  }
+}
+
+async function verifyChain() {
+  const el = document.getElementById('chain-status');
+  el.style.display = 'block';
+  el.innerHTML = '<div class="card" style="padding:12px;color:var(--text-secondary);">验证中...</div>';
+  try {
+    const data = await apiFetch('/api/audit/verify');
+    if (!data) return;
+    const ok = data.valid || data.isValid;
+    el.innerHTML = `<div class="card" style="padding:12px;border-left:4px solid ${ok ? 'var(--accent-green)' : 'var(--accent-red)'};">
+      ${ok ? '✅ 哈希链完整，未检测到篡改' : `❌ 哈希链验证失败: ${data.error || '数据异常'}`}
+    </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="card" style="padding:12px;border-left:4px solid var(--accent-red);">❌ 验证失败: ${e.message}</div>`;
+  }
+}
+
+function changePage(delta) {
+  page = Math.max(1, Math.min(totalPages, page + delta));
+  loadAudit();
+}
+
+loadAudit();
+</script>
+</body>
+</html>

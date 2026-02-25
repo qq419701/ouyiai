@@ -1,6 +1,8 @@
-import { callDeepSeek } from './ai-providers/deepseek';
-import { callOpenAI } from './ai-providers/openai';
-import { callClaude } from './ai-providers/claude';
+// AI 分析引擎：并行调用三个 AI 模型（豆包/Gemini/ChatGPT）进行市场分析
+// 支持超时保护和错误降级处理
+import { callDoubao } from './ai-providers/doubao';
+import { callGemini } from './ai-providers/gemini';
+import { callChatGPT } from './ai-providers/chatgpt';
 import { getModelConfig, selectModelTier, TierDecisionParams } from './model-selector';
 import { AIOutput } from './types';
 import { CoinSymbol, ModelTier } from '../../utils/types';
@@ -28,14 +30,14 @@ export class AIEngine {
     const ai3Config = getModelConfig('AI-3', tier);
 
     const tasks = [
-      withTimeout(callDeepSeek(prompt, ai1Config.model, coin), AI_TIMEOUT_MS, 'AI-1').catch(
-        (err) => { logger.warn({ err }, 'AI-1 failed'); return null; },
+      withTimeout(callDoubao(prompt, ai1Config.model, coin), AI_TIMEOUT_MS, 'AI-1').catch(
+        (err) => { logger.warn({ err }, 'AI-1(豆包) failed'); return null; },
       ),
-      withTimeout(callOpenAI(prompt, ai2Config.model, coin), AI_TIMEOUT_MS, 'AI-2').catch(
-        (err) => { logger.warn({ err }, 'AI-2 failed'); return null; },
+      withTimeout(callGemini(prompt, ai2Config.model, coin), AI_TIMEOUT_MS, 'AI-2').catch(
+        (err) => { logger.warn({ err }, 'AI-2(Gemini) failed'); return null; },
       ),
-      withTimeout(callClaude(prompt, ai3Config.model, coin), AI_TIMEOUT_MS, 'AI-3').catch(
-        (err) => { logger.warn({ err }, 'AI-3 failed'); return null; },
+      withTimeout(callChatGPT(prompt, ai3Config.model, coin), AI_TIMEOUT_MS, 'AI-3').catch(
+        (err) => { logger.warn({ err }, 'AI-3(ChatGPT) failed'); return null; },
       ),
     ];
 

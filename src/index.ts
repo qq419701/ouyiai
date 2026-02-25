@@ -1,6 +1,8 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
+import staticPlugin from '@fastify/static';
+import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 
@@ -30,6 +32,9 @@ import { registerOrderRoutes } from './api/routes/orders';
 import { registerAuditRoutes } from './api/routes/audit';
 import { registerHealthRoutes } from './api/routes/health';
 import { registerConfigRoutes } from './api/routes/config';
+import { registerDashboardRoutes } from './api/routes/dashboard';
+import { registerMonitorRoutes } from './api/routes/monitor';
+import { registerNotifyRoutes } from './api/routes/notify';
 
 import { COIN_SYMBOLS } from './config/coins';
 
@@ -42,6 +47,14 @@ async function bootstrap() {
   await fastify.register(cors, { origin: true });
   await fastify.register(jwt, { secret: env.JWT_SECRET });
   await registerRateLimit(fastify);
+
+  // 静态文件服务（Web 管理面板）
+  await fastify.register(staticPlugin, {
+    root: path.join(__dirname, '..', 'src', 'public'),
+    prefix: '/',
+    index: 'index.html',
+    decorateReply: false,
+  });
 
   // Database
   const prisma = new PrismaClient();
@@ -86,21 +99,16 @@ async function bootstrap() {
     return { token };
   });
 
-  // Routes
+  // Routes（API）
   registerAccountRoutes(fastify, accountManager);
   registerAnalysisRoutes(fastify, prisma);
   registerOrderRoutes(fastify, prisma);
   registerAuditRoutes(fastify, auditQueryService);
   registerHealthRoutes(fastify, healthChecker);
   registerConfigRoutes(fastify);
-
-  // Root
-  fastify.get('/', async () => ({
-    name: 'OKX 现货 AI 分析系统',
-    version: '1.0.0',
-    status: 'running',
-    timestamp: new Date().toISOString(),
-  }));
+  registerDashboardRoutes(fastify, prisma, healthChecker);
+  registerMonitorRoutes(fastify, healthChecker);
+  registerNotifyRoutes(fastify, alerter);
 
   // Initialize
   try {

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仪表盘 - OKX AI 分析系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<!-- 左侧导航 -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>🤖 OKX AI<br>分析系统 V2.0</h1>
+    <p>现货智能分析平台</p>
+  </div>
+  <div class="nav-menu">
+    <a class="nav-item" href="/"><span class="icon">📊</span><span>仪表盘</span></a>
+    <a class="nav-item" href="/accounts.html"><span class="icon">👤</span><span>账户管理</span></a>
+    <a class="nav-item" href="/analysis.html"><span class="icon">🧠</span><span>AI分析</span></a>
+    <a class="nav-item" href="/orders.html"><span class="icon">📋</span><span>交易记录</span></a>
+    <a class="nav-item" href="/audit.html"><span class="icon">🔍</span><span>审计日志</span></a>
+    <a class="nav-item" href="/monitor.html"><span class="icon">🖥️</span><span>系统监控</span></a>
+    <a class="nav-item" href="/settings.html"><span class="icon">⚙️</span><span>系统配置</span></a>
+  </div>
+  <div class="sidebar-footer">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <span id="mode-badge">--</span>
+      <button class="btn btn-sm btn-secondary" onclick="logout()">退出</button>
+    </div>
+  </div>
+</nav>
+
+<!-- 主内容 -->
+<main class="main-content">
+  <div class="page-header">
+    <div>
+      <div class="page-title">系统仪表盘</div>
+      <div class="page-subtitle" id="last-update">加载中...</div>
+    </div>
+    <button class="btn btn-secondary" onclick="loadDashboard()">🔄 刷新</button>
+  </div>
+
+  <!-- 系统状态卡片 -->
+  <div class="grid grid-4" style="margin-bottom:20px;">
+    <div class="stat-card">
+      <div class="stat-label">系统健康评分</div>
+      <div class="stat-value" id="health-score" style="color:var(--accent-green)">--</div>
+      <div class="progress"><div class="progress-bar" id="health-bar" style="width:0%"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">运行模式</div>
+      <div class="stat-value" style="font-size:18px;" id="run-mode">--</div>
+      <div class="stat-change" id="uptime">运行时长: --</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">今日分析次数</div>
+      <div class="stat-value" id="analysis-count">--</div>
+      <div class="stat-change up" id="analysis-cost">预估成本: --</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">今日交易次数</div>
+      <div class="stat-value" id="order-count">--</div>
+      <div class="stat-change" id="order-rate">成功率: --</div>
+    </div>
+  </div>
+
+  <!-- 价格卡片 -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title">实时行情</div>
+    <div class="grid grid-3">
+      <div id="price-BTC" class="stat-card">
+        <div class="stat-label">BTC/USDT</div>
+        <div class="stat-value" style="color:var(--accent-yellow)">--</div>
+        <div class="stat-change">信号: <span class="badge badge-gray">--</span></div>
+      </div>
+      <div id="price-ETH" class="stat-card">
+        <div class="stat-label">ETH/USDT</div>
+        <div class="stat-value" style="color:var(--accent-blue)">--</div>
+        <div class="stat-change">信号: <span class="badge badge-gray">--</span></div>
+      </div>
+      <div id="price-SOL" class="stat-card">
+        <div class="stat-label">SOL/USDT</div>
+        <div class="stat-value" style="color:var(--accent-green)">--</div>
+        <div class="stat-change">信号: <span class="badge badge-gray">--</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <!-- AI 最新分析 -->
+    <div class="card">
+      <div class="card-title">最新 AI 分析信号</div>
+      <div id="signals-list"><div class="loading">加载中...</div></div>
+    </div>
+
+    <!-- 系统告警 -->
+    <div class="card">
+      <div class="card-title">系统告警</div>
+      <div id="alerts-list"><div class="loading">加载中...</div></div>
+    </div>
+  </div>
+
+  <!-- 巨鲸动向 -->
+  <div class="card">
+    <div class="card-title">🐋 巨鲸动向摘要</div>
+    <div id="whale-summary"><div class="loading">加载中...</div></div>
+  </div>
+</main>
+
+<script src="/js/app.js"></script>
+<script>
+const startTime = Date.now();
+
+async function loadDashboard() {
+  try {
+    const data = await apiFetch('/api/dashboard');
+    if (!data) return;
+
+    // 系统状态
+    const score = data.health?.score || 0;
+    document.getElementById('health-score').textContent = score;
+    const bar = document.getElementById('health-bar');
+    bar.style.width = score + '%';
+    bar.className = 'progress-bar' + (score < 50 ? ' red' : score < 80 ? ' yellow' : '');
+    document.getElementById('run-mode').textContent = modeLabel(data.health?.mode);
+    document.getElementById('last-update').textContent = '最后更新: ' + fmt.time(data.timestamp);
+    document.getElementById('mode-badge').innerHTML = `<span class="badge ${score > 80 ? 'badge-green' : score > 50 ? 'badge-yellow' : 'badge-red'}">${modeLabel(data.health?.mode)}</span>`;
+
+    // 统计
+    document.getElementById('analysis-count').textContent = fmt.number(data.stats?.analysisToday || 0);
+    document.getElementById('analysis-cost').textContent = '预估成本: $' + (data.stats?.costToday || 0).toFixed(4);
+    document.getElementById('order-count').textContent = fmt.number(data.stats?.ordersToday || 0);
+    document.getElementById('order-rate').textContent = '成功率: ' + fmt.pct(data.stats?.orderSuccessRate);
+
+    // 价格
+    const prices = data.prices || {};
+    ['BTC', 'ETH', 'SOL'].forEach(coin => {
+      const p = prices[coin + '-USDT'] || {};
+      const el = document.getElementById('price-' + coin);
+      if (el) {
+        el.querySelector('.stat-value').textContent = fmt.price(p.price);
+        const action = (data.signals || {})[coin + '-USDT']?.action || 'hold';
+        el.querySelector('.stat-change').innerHTML = `信号: <span class="badge ${actionBadge[action]}">${actionLabel[action] || action}</span>`;
+      }
+    });
+
+    // AI 信号列表
+    const signals = data.signals || {};
+    const signalHtml = Object.entries(signals).map(([coin, s]) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color);">
+        <div>
+          <span style="font-weight:600;">${coin}</span>
+          <span class="badge ${actionBadge[s.action] || 'badge-gray'}" style="margin-left:8px;">${actionLabel[s.action] || s.action}</span>
+        </div>
+        <div style="text-align:right;font-size:12px;color:var(--text-secondary);">
+          置信度 ${fmt.pct(s.confidence)} | ${s.consensus_type === '3_unanimous' ? '3票一致' : s.consensus_type === '2_majority' ? '2票多数' : '分歧'}
+        </div>
+      </div>
+    `).join('') || '<div style="color:var(--text-secondary);font-size:13px;">暂无信号</div>';
+    document.getElementById('signals-list').innerHTML = signalHtml;
+
+    // 告警
+    const alerts = data.alerts || [];
+    const alertHtml = alerts.length > 0 ? alerts.slice(0, 5).map(a => `
+      <div class="alert-item alert-${a.level || 'info'}">
+        <div>
+          <div class="alert-text">${a.message}</div>
+          <div class="alert-time">${fmt.time(a.timestamp)}</div>
+        </div>
+      </div>
+    `).join('') : '<div style="color:var(--text-secondary);font-size:13px;padding:10px 0;">暂无告警 ✓</div>';
+    document.getElementById('alerts-list').innerHTML = alertHtml;
+
+    // 巨鲸
+    const whale = data.whale || {};
+    document.getElementById('whale-summary').innerHTML = `
+      <div class="grid grid-3">
+        ${['BTC-USDT','ETH-USDT','SOL-USDT'].map(coin => {
+          const w = whale[coin] || {};
+          return `<div class="stat-card">
+            <div class="stat-label">${coin}</div>
+            <div style="font-size:20px;font-weight:700;margin:6px 0;">${w.score || '--'}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">${w.score > 70 ? '🐋 偏多' : w.score > 50 ? '⚖️ 中性' : w.score ? '🐻 偏空' : '数据不足'}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  } catch (e) {
+    console.error('Dashboard load error:', e);
+  }
+}
+
+function modeLabel(m) {
+  return { normal: '正常', degraded: '降级', emergency: '紧急' }[m] || m || '--';
+}
+
+// 更新运行时长
+setInterval(() => {
+  const s = Math.floor((Date.now() - startTime) / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  document.getElementById('uptime').textContent = `运行时长: ${h}时${m}分`;
+}, 1000);
+
+loadDashboard();
+setInterval(loadDashboard, 30000);
+</script>
+</body>
+</html>

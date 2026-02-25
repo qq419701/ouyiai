@@ -1,18 +1,22 @@
+// 模型选择器：根据市场状态选择合适的 AI 模型档位
+// AI-1: 豆包（字节跳动火山引擎）
+// AI-2: Google Gemini
+// AI-3: ChatGPT（OpenAI）
 import { ModelTierConfig, ModelConfig } from './types';
 import { ModelTier, RiskLevel } from '../../utils/types';
 
 const AI_TIERS: Record<string, ModelTierConfig> = {
   'AI-1': {
-    cheap: { provider: 'deepseek', model: 'deepseek-chat', costPer1kTokens: 0.0001 },
-    premium: { provider: 'deepseek', model: 'deepseek-chat', costPer1kTokens: 0.0001 },
+    cheap: { provider: 'doubao', model: 'doubao-pro-32k', costPer1kTokens: 0.0001 },
+    premium: { provider: 'doubao', model: 'doubao-pro-256k', costPer1kTokens: 0.0007 },
   },
   'AI-2': {
-    cheap: { provider: 'openai', model: 'gpt-4o-mini', costPer1kTokens: 0.00015 },
-    premium: { provider: 'openai', model: 'gpt-4o', costPer1kTokens: 0.005 },
+    cheap: { provider: 'gemini', model: 'gemini-2.0-flash', costPer1kTokens: 0.0001 },
+    premium: { provider: 'gemini', model: 'gemini-2.0-pro', costPer1kTokens: 0.003 },
   },
   'AI-3': {
-    cheap: { provider: 'anthropic', model: 'claude-3-5-haiku-20241022', costPer1kTokens: 0.0001 },
-    premium: { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022', costPer1kTokens: 0.003 },
+    cheap: { provider: 'openai', model: 'gpt-4o-mini', costPer1kTokens: 0.00015 },
+    premium: { provider: 'openai', model: 'gpt-4o', costPer1kTokens: 0.005 },
   },
 };
 

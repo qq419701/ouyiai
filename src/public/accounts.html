@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>账户管理 - OKX AI 分析系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>🤖 OKX AI<br>分析系统 V2.0</h1>
+    <p>现货智能分析平台</p>
+  </div>
+  <div class="nav-menu">
+    <a class="nav-item" href="/"><span class="icon">📊</span><span>仪表盘</span></a>
+    <a class="nav-item" href="/accounts.html"><span class="icon">👤</span><span>账户管理</span></a>
+    <a class="nav-item" href="/analysis.html"><span class="icon">🧠</span><span>AI分析</span></a>
+    <a class="nav-item" href="/orders.html"><span class="icon">📋</span><span>交易记录</span></a>
+    <a class="nav-item" href="/audit.html"><span class="icon">🔍</span><span>审计日志</span></a>
+    <a class="nav-item" href="/monitor.html"><span class="icon">🖥️</span><span>系统监控</span></a>
+    <a class="nav-item" href="/settings.html"><span class="icon">⚙️</span><span>系统配置</span></a>
+  </div>
+  <div class="sidebar-footer">
+    <button class="btn btn-sm btn-secondary" onclick="logout()">退出登录</button>
+  </div>
+</nav>
+
+<main class="main-content">
+  <div class="page-header">
+    <div>
+      <div class="page-title">多账户管理</div>
+      <div class="page-subtitle">管理 OKX 交易账户及权限</div>
+    </div>
+    <button class="btn btn-primary" onclick="showAddModal()">＋ 添加账户</button>
+  </div>
+
+  <!-- 账户列表 -->
+  <div class="card">
+    <div class="card-title">账户列表</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>账户名称</th>
+            <th>状态</th>
+            <th>创建时间</th>
+            <th>余额 (USDT)</th>
+            <th>权限设置</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="accounts-tbody">
+          <tr><td colspan="6" class="loading">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- 添加账户弹窗 -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">添加 OKX 账户</div>
+      <button class="modal-close" onclick="closeModal('add-modal')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">账户名称 *</label>
+      <input class="form-control" id="acc-name" placeholder="例如: 主账户">
+    </div>
+    <div class="form-group">
+      <label class="form-label">API Key *</label>
+      <input class="form-control" id="acc-key" placeholder="OKX API Key">
+    </div>
+    <div class="form-group">
+      <label class="form-label">API Secret *</label>
+      <input class="form-control" type="password" id="acc-secret" placeholder="OKX API Secret">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Passphrase *</label>
+      <input class="form-control" type="password" id="acc-pass" placeholder="OKX API Passphrase">
+    </div>
+    <div id="add-err" style="color:var(--accent-red);font-size:13px;margin-bottom:12px;display:none;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-secondary" onclick="closeModal('add-modal')">取消</button>
+      <button class="btn btn-primary" onclick="addAccount()">确认添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 权限设置弹窗 -->
+<div class="modal-overlay" id="perm-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">权限设置</div>
+      <button class="modal-close" onclick="closeModal('perm-modal')">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">为账户 <strong id="perm-acc-name"></strong> 设置各币种操作权限</p>
+    <div id="perm-content"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-secondary" onclick="closeModal('perm-modal')">关闭</button>
+      <button class="btn btn-primary" onclick="savePermissions()">保存权限</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+let currentPermAccId = null;
+
+const permLabels = {
+  observe: '仅观察',
+  notify_only: '仅通知',
+  auto_buy: '自动买入',
+  auto_sell: '自动卖出',
+  auto_both: '自动买卖',
+};
+
+async function loadAccounts() {
+  try {
+    const accounts = await apiFetch('/api/accounts');
+    if (!accounts) return;
+    if (!accounts.length) {
+      document.getElementById('accounts-tbody').innerHTML =
+        '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:24px;">暂无账户，请点击"添加账户"</td></tr>';
+      return;
+    }
+    document.getElementById('accounts-tbody').innerHTML = accounts.map(a => `
+      <tr>
+        <td><strong>${a.name}</strong></td>
+        <td>${statusBadge(a.status || 'active')}</td>
+        <td>${fmt.time(a.created_at || a.createdAt)}</td>
+        <td id="bal-${a.id}">--</td>
+        <td>
+          <button class="btn btn-sm btn-secondary" onclick="showPermModal('${a.id}','${a.name}')">设置权限</button>
+        </td>
+        <td>
+          <button class="btn btn-sm btn-danger" onclick="deactivateAccount('${a.id}')">停用</button>
+        </td>
+      </tr>
+    `).join('');
+    // 加载余额
+    accounts.forEach(a => loadBalance(a.id));
+  } catch(e) {
+    document.getElementById('accounts-tbody').innerHTML = `<tr><td colspan="6" style="color:var(--accent-red);">加载失败: ${e.message}</td></tr>`;
+  }
+}
+
+async function loadBalance(id) {
+  try {
+    const data = await apiFetch(`/api/accounts/${id}/balance`);
+    if (data) document.getElementById('bal-' + id).textContent = fmt.price(data.usdt);
+  } catch {}
+}
+
+function showAddModal() {
+  document.getElementById('add-modal').classList.add('show');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+async function addAccount() {
+  const name = document.getElementById('acc-name').value.trim();
+  const apiKey = document.getElementById('acc-key').value.trim();
+  const apiSecret = document.getElementById('acc-secret').value.trim();
+  const passphrase = document.getElementById('acc-pass').value.trim();
+  const errEl = document.getElementById('add-err');
+  if (!name || !apiKey || !apiSecret || !passphrase) {
+    errEl.textContent = '请填写所有必填字段'; errEl.style.display = 'block'; return;
+  }
+  try {
+    await apiFetch('/api/accounts', { method: 'POST', body: JSON.stringify({ name, apiKey, apiSecret, passphrase }) });
+    closeModal('add-modal');
+    loadAccounts();
+    ['acc-name','acc-key','acc-secret','acc-pass'].forEach(id => document.getElementById(id).value = '');
+  } catch(e) {
+    errEl.textContent = '添加失败: ' + e.message; errEl.style.display = 'block';
+  }
+}
+
+async function deactivateAccount(id) {
+  if (!confirm('确定要停用该账户吗？')) return;
+  try {
+    await apiFetch(`/api/accounts/${id}`, { method: 'DELETE' });
+    loadAccounts();
+  } catch(e) { alert('停用失败: ' + e.message); }
+}
+
+function showPermModal(id, name) {
+  currentPermAccId = id;
+  document.getElementById('perm-acc-name').textContent = name;
+  const coins = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
+  document.getElementById('perm-content').innerHTML = coins.map(coin => `
+    <div class="form-group">
+      <label class="form-label">${coin}</label>
+      <select class="form-control" id="perm-${coin}">
+        ${Object.entries(permLabels).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
+      </select>
+    </div>
+  `).join('');
+  document.getElementById('perm-modal').classList.add('show');
+}
+
+async function savePermissions() {
+  const coins = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
+  const permissions = {};
+  coins.forEach(c => { permissions[c] = document.getElementById('perm-' + c).value; });
+  try {
+    await apiFetch(`/api/accounts/${currentPermAccId}/permissions`, {
+      method: 'POST',
+      body: JSON.stringify({ permissions }),
+    });
+    closeModal('perm-modal');
+    alert('权限保存成功');
+  } catch(e) { alert('保存失败: ' + e.message); }
+}
+
+loadAccounts();
+</script>
+</body>
+</html>
