@@ -22,10 +22,13 @@ export async function callDoubao(
 ): Promise<AIOutput> {
   const start = Date.now();
 
+  // 如果传入的 model 不是 endpoint 格式（ep-xxx），则使用环境变量中的 endpoint ID
+  const actualModel = model.startsWith('ep-') ? model : (env.DOUBAO_ENDPOINT_ID || model);
+
   const response = await axios.post(
     `${DOUBAO_BASE_URL}/chat/completions`,
     {
-      model,
+      model: actualModel,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,
       max_tokens: 500,

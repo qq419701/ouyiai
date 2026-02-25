@@ -22,9 +22,9 @@
 - [ ] REST备用降级正常工作
 
 ## 4. AI分析测试
-- [ ] DeepSeek API调用成功
-- [ ] OpenAI API调用成功
-- [ ] Claude API调用成功
+- [ ] 豆包 API调用成功
+- [ ] Gemini API调用成功
+- [ ] ChatGPT API调用成功
 - [ ] 三AI超时后不阻塞
 - [ ] cheap/premium模型正确切换
 

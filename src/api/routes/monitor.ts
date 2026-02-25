@@ -21,9 +21,9 @@ export function registerMonitorRoutes(
         error_rate: wsResult?.errorRate || 0,
       },
       ai: {
-        'AI-1': { available: !!env.DOUBAO_API_KEY, latency_ms: null },   // 豆包
-        'AI-2': { available: !!env.GEMINI_API_KEY, latency_ms: null },   // Gemini
-        'AI-3': { available: !!env.OPENAI_API_KEY, latency_ms: null },   // ChatGPT
+        'AI-1': { available: !!env.DOUBAO_API_KEY && !!env.DOUBAO_ENDPOINT_ID, latency_ms: null, name: '豆包' },
+        'AI-2': { available: !!env.GEMINI_API_KEY, latency_ms: null, name: 'Gemini 2.5' },
+        'AI-3': { available: !!env.OPENAI_API_KEY, latency_ms: null, name: 'ChatGPT' },
       },
       whale: {
         arkham: { available: !!env.ARKHAM_API_KEY },

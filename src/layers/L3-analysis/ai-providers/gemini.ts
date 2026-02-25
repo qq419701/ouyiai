@@ -43,8 +43,8 @@ export async function callGemini(
   // Gemini token 统计
   const tokens = (response.data.usageMetadata?.promptTokenCount || 0) +
     (response.data.usageMetadata?.candidatesTokenCount || 0);
-  // gemini-2.0-flash 免费额度大，pro 定价较高
-  const costPer1k = model.includes('pro') ? 0.003 : 0.0001;
+  // gemini-2.5-flash: $0.30/百万input tokens，gemini-2.5-flash-lite: $0.05/百万input tokens
+  const costPer1k = model.includes('lite') ? 0.00005 : 0.0003;
 
   let analysis;
   try {
